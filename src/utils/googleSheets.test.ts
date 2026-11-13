@@ -144,3 +144,39 @@ test("submitFormToBackend falls back to Apps Script webhook when /api/submission
     globalThis.fetch = originalFetch;
   }
 });
+
+test("submitFormToBackend dispatches webhook directly when skipBackendProbe is true", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ url: String(input), init });
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const res = await submitFormToBackend(
+      {
+        formType: "Contact Us Enquiry",
+        name: "Vishwanath Naik",
+        email: "vishunaik1229@gmail.com",
+        categoryOrSubject: "Sales Enquiries",
+        phone: "7507384721",
+        notesOrMessage: "Testing direct dispatch",
+        whatsappMessage: "Enquiry",
+        submittedAt: "2026-11-13T14:15:00.000Z",
+      },
+      {
+        webhookUrl: "https://script.google.com/macros/s/test/exec?gid=0",
+        skipBackendProbe: true,
+      },
+    );
+
+    assert.equal(res.ok, true);
+    assert.equal(res.syncedToSheet, true);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0].url, /^https:\/\/script\.google\.com\/macros\/s\/test\/exec\?gid=0&/);
+    assert.equal(calls[0].init?.keepalive, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

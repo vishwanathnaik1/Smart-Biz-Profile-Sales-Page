@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -82,6 +83,7 @@ export function GoogleSheetsProvider({ children }: { children: ReactNode }) {
     typeof window !== "undefined" ? loadStoredConnection() : null,
   );
   const [sheetsModalOpen, setSheetsModalOpen] = useState<boolean>(false);
+  const backendAvailableRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     const unsubscribe = initGoogleAuth(
@@ -103,12 +105,13 @@ export function GoogleSheetsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void fetchBackendSheetConfig()
       .then((backendConfig) => {
+        backendAvailableRef.current = true;
         if (backendConfig) {
           setConnection(backendConfig);
         }
       })
       .catch(() => {
-        // Backend config sync unavailable
+        backendAvailableRef.current = false;
       });
   }, []);
 
@@ -170,6 +173,7 @@ export function GoogleSheetsProvider({ children }: { children: ReactNode }) {
         const res = await submitFormToBackend(entry, {
           accessToken: token,
           sheetConfig: connection,
+          skipBackendProbe: backendAvailableRef.current === false,
         });
         return { synced: res.syncedToSheet };
       } catch (err) {

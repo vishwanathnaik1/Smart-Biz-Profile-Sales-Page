@@ -133,6 +133,14 @@ export interface WebhookRequestData {
     spreadsheetId: string;
     sheetTitle: string;
     row: string[];
+    "Submitted At": string;
+    "Form Type": FormSubmissionType;
+    Name: string;
+    Email: string;
+    "Business Type / Subject": string;
+    "WhatsApp / Phone": string;
+    Message: string;
+    "Generated WhatsApp Message": string;
   };
   formBody: string;
 }
@@ -198,6 +206,14 @@ export function buildWebhookRequest(
       spreadsheetId,
       sheetTitle,
       row,
+      "Submitted At": submittedAt,
+      "Form Type": normalizedEntry.formType,
+      Name: normalizedEntry.name,
+      Email: normalizedEntry.email,
+      "Business Type / Subject": normalizedEntry.categoryOrSubject,
+      "WhatsApp / Phone": normalizedEntry.phone,
+      Message: normalizedEntry.notesOrMessage,
+      "Generated WhatsApp Message": normalizedEntry.whatsappMessage,
     },
     formBody: new URLSearchParams(flatParams).toString(),
   };
@@ -225,6 +241,10 @@ async function parseBackendResponse<T>(res: Response): Promise<T> {
 
 export async function fetchBackendSheetConfig(): Promise<ConnectedSheetConfig | null> {
   const res = await fetch("/api/sheets/config");
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!res.ok || !contentType.includes("application/json")) {
+    throw new SheetsApiError("Backend Sheets config unavailable.", res.status);
+  }
   const data = await parseBackendResponse<{ config: ConnectedSheetConfig | null }>(res);
   return data.config;
 }
@@ -305,6 +325,7 @@ export async function submitFormToBackend(
     accessToken?: string | null;
     sheetConfig?: ConnectedSheetConfig | null;
     webhookUrl?: string;
+    skipBackendProbe?: boolean;
   },
 ): Promise<{ ok: boolean; syncedToSheet: boolean; submittedAt: string }> {
   const submittedAt = formatAsiaKolkataTimestamp(entry.submittedAt ?? new Date());
@@ -312,6 +333,35 @@ export async function submitFormToBackend(
     ...entry,
     submittedAt,
   };
+  const fallbackWebhookUrl = (options?.webhookUrl ?? getConfiguredWebhookUrl()).trim();
+  const targetSpreadsheetId =
+    options?.sheetConfig?.spreadsheetId || getConfiguredSpreadsheetId();
+  const targetSheetTitle = options?.sheetConfig?.sheetTitle || getConfiguredSheetTab();
+
+  const dispatchClientWebhook = () => {
+    const webhookReq = buildWebhookRequest(fallbackWebhookUrl, normalizedEntry, {
+      spreadsheetId: targetSpreadsheetId,
+      sheetTitle: targetSheetTitle,
+    });
+
+    return fetch(webhookReq.url, {
+      method: "POST",
+      mode: "no-cors",
+      keepalive: true,
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(webhookReq.payload),
+    });
+  };
+
+  if (options?.skipBackendProbe && !options?.accessToken && fallbackWebhookUrl) {
+    await dispatchClientWebhook();
+    return {
+      ok: true,
+      syncedToSheet: true,
+      submittedAt,
+    };
+  }
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -327,8 +377,8 @@ export async function submitFormToBackend(
       headers,
       body: JSON.stringify({
         ...normalizedEntry,
-        spreadsheetId: options?.sheetConfig?.spreadsheetId || getConfiguredSpreadsheetId(),
-        sheetTitle: options?.sheetConfig?.sheetTitle || getConfiguredSheetTab(),
+        spreadsheetId: targetSpreadsheetId,
+        sheetTitle: targetSheetTitle,
       }),
     });
 
@@ -355,21 +405,8 @@ export async function submitFormToBackend(
     backendError = err;
   }
 
-  const fallbackWebhookUrl = (options?.webhookUrl ?? getConfiguredWebhookUrl()).trim();
   if (fallbackWebhookUrl) {
-    const webhookReq = buildWebhookRequest(fallbackWebhookUrl, normalizedEntry, {
-      spreadsheetId: options?.sheetConfig?.spreadsheetId || getConfiguredSpreadsheetId(),
-      sheetTitle: options?.sheetConfig?.sheetTitle || getConfiguredSheetTab(),
-    });
-
-    await fetch(webhookReq.url, {
-      method: "POST",
-      mode: "no-cors",
-      keepalive: true,
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(webhookReq.payload),
-    });
-
+    await dispatchClientWebhook();
     return {
       ok: true,
       syncedToSheet: true,
