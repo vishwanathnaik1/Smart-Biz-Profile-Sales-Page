@@ -1,0 +1,6 @@
+{
+  "name": "Smart Biz Profile",
+  "description": "One Link. All Your Business. Turn Instagram visitors into paying customers with one Smart Business Profile.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
