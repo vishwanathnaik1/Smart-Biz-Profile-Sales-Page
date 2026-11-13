@@ -1,15 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import {
-  Check,
-  CheckCircle2,
-  Clock,
-  Copy,
-  ExternalLink,
-  FileSpreadsheet,
-  MessageCircle,
-  X,
-} from "lucide-react";
-import { useGoogleSheets, type SheetSyncResult } from "../context/GoogleSheetsContext";
+import { Check, Clock, Copy, ExternalLink, MessageCircle, X } from "lucide-react";
+import { useGoogleSheets } from "../context/GoogleSheetsContext";
 import { BUSINESS_TYPES } from "../data/landingData";
 import {
   buildWhatsAppMessage,
@@ -26,8 +17,7 @@ interface ClaimProfileModalProps {
 }
 
 export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
-  const { connection, accessToken, needsAuth, openSheetsModal, syncFormSubmission } =
-    useGoogleSheets();
+  const { syncFormSubmission } = useGoogleSheets();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -37,7 +27,6 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedUrl, setSubmittedUrl] = useState<string | null>(null);
   const [submittedMessage, setSubmittedMessage] = useState<string>("");
-  const [sheetResult, setSheetResult] = useState<SheetSyncResult | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -69,7 +58,7 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
     const whatsappUrl = buildWhatsAppUrl(payload);
 
     setIsSubmitting(true);
-    const syncOutcome = await syncFormSubmission({
+    await syncFormSubmission({
       formType: "Claim Smart Biz Profile",
       name: payload.name,
       email: payload.email,
@@ -80,7 +69,6 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
     });
     setIsSubmitting(false);
 
-    setSheetResult(syncOutcome);
     setSubmittedUrl(whatsappUrl);
     setSubmittedMessage(message);
     triggerWhatsAppRedirect(whatsappUrl);
@@ -100,12 +88,9 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
   const handleReset = () => {
     setSubmittedUrl(null);
     setSubmittedMessage("");
-    setSheetResult(null);
     setCopied(false);
     setErrors({});
   };
-
-  const isSheetActive = Boolean(connection && accessToken && !needsAuth);
 
   return (
     <div
@@ -144,32 +129,8 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
           Fill this in and we&apos;ll continue on WhatsApp — it takes less than 30 seconds.
         </p>
 
-        {/* Compact Google Sheets Sync Bar */}
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[oklch(98%_0.012_252)] px-3.5 py-2.5 text-xs">
-          <div className="flex min-w-0 items-center gap-2">
-            <FileSpreadsheet
-              className={`h-4 w-4 shrink-0 ${isSheetActive ? "text-emerald-600" : "text-[var(--primary)]"}`}
-              aria-hidden="true"
-            />
-            <span className="truncate font-medium text-[var(--foreground)]">
-              {isSheetActive && connection
-                ? `Syncing to: ${connection.spreadsheetTitle}`
-                : connection
-                  ? "Reconnect Google to sync leads"
-                  : "Google Sheet not connected"}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={openSheetsModal}
-            className="shrink-0 font-semibold text-[var(--primary)] hover:underline cursor-pointer"
-          >
-            {isSheetActive ? "Manage" : "Connect Sheet"}
-          </button>
-        </div>
-
         {!submittedUrl ? (
-          <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-3.5">
+          <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
             <div>
               <label
                 htmlFor="lead-name"
@@ -288,7 +249,7 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
               className="mt-2 w-full"
             >
               <MessageCircle className="h-4 w-4" aria-hidden="true" />
-              {isSubmitting ? "Saving & Opening WhatsApp..." : "Continue on WhatsApp"}
+              {isSubmitting ? "Opening WhatsApp..." : "Continue on WhatsApp"}
             </Button>
 
             <p className="text-center text-xs text-[var(--muted-foreground)]">
@@ -297,22 +258,9 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
           </form>
         ) : (
           <div className="mt-5 space-y-4">
-            {sheetResult?.synced && (
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-                Saved to Google Sheet ({connection?.spreadsheetTitle})
-              </div>
-            )}
-
-            {sheetResult && !sheetResult.synced && sheetResult.reason === "error" && (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-900">
-                Sheet sync note: {sheetResult.message}
-              </p>
-            )}
-
             <div className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4">
               <p className="text-xs font-semibold text-[var(--foreground)]">
-                Your customized WhatsApp message (+91 8329410074):
+                Your WhatsApp message is ready:
               </p>
               <p className="mt-1.5 text-xs leading-relaxed text-[var(--muted-foreground)]">
                 {submittedMessage}

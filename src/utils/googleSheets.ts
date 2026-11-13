@@ -41,8 +41,6 @@ export interface ConnectedSheetConfig {
   spreadsheetUrl: string;
 }
 
-const SHEETS_API_BASE = "https://sheets.googleapis.com/v4/spreadsheets";
-
 export function extractSpreadsheetId(rawInput: string): string | null {
   const trimmed = rawInput.trim();
   if (!trimmed) return null;
@@ -88,46 +86,46 @@ export class SheetsApiError extends Error {
   }
 }
 
-async function parseSheetsResponse<T>(res: Response): Promise<T> {
+async function parseBackendResponse<T>(res: Response): Promise<T> {
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const apiMessage =
-      data?.error?.message || `Google Sheets request failed with status ${res.status}.`;
+      data?.error || `Backend Sheets request failed with status ${res.status}.`;
     throw new SheetsApiError(apiMessage, res.status);
   }
   return data as T;
+}
+
+export async function fetchBackendSheetConfig(): Promise<ConnectedSheetConfig | null> {
+  const res = await fetch("/api/sheets/config");
+  const data = await parseBackendResponse<{ config: ConnectedSheetConfig | null }>(res);
+  return data.config;
+}
+
+export async function saveBackendSheetConfig(
+  config: ConnectedSheetConfig | null,
+): Promise<void> {
+  const res = await fetch("/api/sheets/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ config }),
+  });
+  await parseBackendResponse(res);
 }
 
 export async function fetchSpreadsheetInfo(
   accessToken: string,
   spreadsheetId: string,
 ): Promise<SpreadsheetMetadata> {
-  const url = `${SHEETS_API_BASE}/${encodeURIComponent(spreadsheetId)}?fields=spreadsheetId,spreadsheetUrl,properties.title,sheets.properties(sheetId,title)`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+  const res = await fetch("/api/sheets/inspect", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ spreadsheetId }),
   });
-  const data = await parseSheetsResponse<{
-    spreadsheetId: string;
-    spreadsheetUrl: string;
-    properties?: { title?: string };
-    sheets?: Array<{ properties?: { sheetId?: number; title?: string } }>;
-  }>(res);
-
-  const sheets: SheetTabInfo[] = (data.sheets ?? [])
-    .map((s) => ({
-      sheetId: s.properties?.sheetId ?? 0,
-      title: s.properties?.title ?? "Sheet1",
-    }))
-    .filter((s) => Boolean(s.title));
-
-  return {
-    spreadsheetId: data.spreadsheetId,
-    title: data.properties?.title || "Connected Spreadsheet",
-    spreadsheetUrl:
-      data.spreadsheetUrl ||
-      `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/edit`,
-    sheets,
-  };
+  return parseBackendResponse<SpreadsheetMetadata>(res);
 }
 
 export async function readSheetPreviewRows(
@@ -135,12 +133,11 @@ export async function readSheetPreviewRows(
   spreadsheetId: string,
   sheetTitle: string,
 ): Promise<string[][]> {
-  const range = `${escapeSheetTitle(sheetTitle)}!A1:H11`;
-  const url = `${SHEETS_API_BASE}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`;
-  const res = await fetch(url, {
+  const params = new URLSearchParams({ spreadsheetId, sheetTitle });
+  const res = await fetch(`/api/sheets/preview?${params.toString()}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const data = await parseSheetsResponse<{ values?: string[][] }>(res);
+  const data = await parseBackendResponse<{ values: string[][] }>(res);
   return data.values ?? [];
 }
 
@@ -149,84 +146,55 @@ export async function initializeSheetHeaders(
   spreadsheetId: string,
   sheetTitle: string,
 ): Promise<void> {
-  const range = `${escapeSheetTitle(sheetTitle)}!A1:H1`;
-  const url = `${SHEETS_API_BASE}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
-  const res = await fetch(url, {
-    method: "PUT",
+  const res = await fetch("/api/sheets/headers", {
+    method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      range,
-      majorDimension: "ROWS",
-      values: [[...SHEET_HEADER_ROW]],
-    }),
+    body: JSON.stringify({ spreadsheetId, sheetTitle }),
   });
-  await parseSheetsResponse(res);
+  await parseBackendResponse(res);
 }
 
 export async function createLeadsSpreadsheet(
   accessToken: string,
   title = "Smart Biz Profile — Form Submissions",
 ): Promise<ConnectedSheetConfig> {
-  const tabTitle = "Form Submissions";
-  const res = await fetch(SHEETS_API_BASE, {
+  const res = await fetch("/api/sheets/create", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      properties: { title },
-      sheets: [
-        {
-          properties: {
-            title: tabTitle,
-            gridProperties: { frozenRowCount: 1 },
-          },
-        },
-      ],
-    }),
+    body: JSON.stringify({ title }),
   });
-
-  const created = await parseSheetsResponse<{
-    spreadsheetId: string;
-    spreadsheetUrl: string;
-    properties?: { title?: string };
-  }>(res);
-
-  await initializeSheetHeaders(accessToken, created.spreadsheetId, tabTitle);
-
-  return {
-    spreadsheetId: created.spreadsheetId,
-    spreadsheetTitle: created.properties?.title || title,
-    sheetTitle: tabTitle,
-    spreadsheetUrl: created.spreadsheetUrl,
-  };
+  return parseBackendResponse<ConnectedSheetConfig>(res);
 }
 
-export async function appendFormSubmission(
-  accessToken: string,
-  spreadsheetId: string,
-  sheetTitle: string,
+export async function submitFormToBackend(
   entry: FormSubmissionEntry,
-): Promise<void> {
-  const range = `${escapeSheetTitle(sheetTitle)}!A:H`;
-  const url = `${SHEETS_API_BASE}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
-  const row = buildSheetSubmissionRow(entry);
+  options?: {
+    accessToken?: string | null;
+    sheetConfig?: ConnectedSheetConfig | null;
+  },
+): Promise<{ ok: boolean; syncedToSheet: boolean; submittedAt: string }> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (options?.accessToken) {
+    headers.Authorization = `Bearer ${options.accessToken}`;
+  }
 
-  const res = await fetch(url, {
+  const res = await fetch("/api/submissions", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify({
-      majorDimension: "ROWS",
-      values: [row],
+      ...entry,
+      spreadsheetId: options?.sheetConfig?.spreadsheetId,
+      sheetTitle: options?.sheetConfig?.sheetTitle,
     }),
   });
 
-  await parseSheetsResponse(res);
+  return parseBackendResponse<{ ok: boolean; syncedToSheet: boolean; submittedAt: string }>(res);
 }

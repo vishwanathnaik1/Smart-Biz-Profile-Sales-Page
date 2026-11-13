@@ -16,7 +16,9 @@ import {
 } from "../utils/googleAuth";
 import {
   SheetsApiError,
-  appendFormSubmission,
+  fetchBackendSheetConfig,
+  saveBackendSheetConfig,
+  submitFormToBackend,
   type ConnectedSheetConfig,
   type FormSubmissionEntry,
 } from "../utils/googleSheets";
@@ -25,8 +27,6 @@ const SHEET_CONFIG_STORAGE_KEY = "sbp_connected_sheet_v1";
 
 export interface SheetSyncResult {
   synced: boolean;
-  reason?: "not_connected" | "needs_auth" | "error";
-  message?: string;
 }
 
 interface GoogleSheetsContextValue {
@@ -100,6 +100,18 @@ export function GoogleSheetsProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    void fetchBackendSheetConfig()
+      .then((backendConfig) => {
+        if (backendConfig) {
+          setConnection(backendConfig);
+        }
+      })
+      .catch(() => {
+        // Backend config sync unavailable
+      });
+  }, []);
+
   const signIn = useCallback(async (): Promise<string | null> => {
     setIsSigningIn(true);
     setAuthError(null);
@@ -134,6 +146,9 @@ export function GoogleSheetsProvider({ children }: { children: ReactNode }) {
     } catch {
       // Storage restricted
     }
+    void saveBackendSheetConfig(config).catch(() => {
+      // Non-blocking backend sync
+    });
   }, []);
 
   const clearConnection = useCallback(() => {
@@ -143,55 +158,27 @@ export function GoogleSheetsProvider({ children }: { children: ReactNode }) {
     } catch {
       // Storage restricted
     }
+    void saveBackendSheetConfig(null).catch(() => {
+      // Non-blocking backend sync
+    });
   }, []);
 
   const syncFormSubmission = useCallback(
     async (entry: FormSubmissionEntry): Promise<SheetSyncResult> => {
-      if (!connection) {
-        return {
-          synced: false,
-          reason: "not_connected",
-          message: "No Google Sheet is connected yet.",
-        };
-      }
-
       const token = getGoogleAccessToken() || accessToken;
-      if (!token) {
-        setNeedsAuth(true);
-        return {
-          synced: false,
-          reason: "needs_auth",
-          message: "Sign in with Google to sync submissions to your sheet.",
-        };
-      }
-
       try {
-        await appendFormSubmission(
-          token,
-          connection.spreadsheetId,
-          connection.sheetTitle,
-          entry,
-        );
-        return { synced: true };
+        const res = await submitFormToBackend(entry, {
+          accessToken: token,
+          sheetConfig: connection,
+        });
+        return { synced: res.syncedToSheet };
       } catch (err) {
         if (err instanceof SheetsApiError && err.status === 401) {
           clearGoogleAccessToken();
           setAccessToken(null);
           setNeedsAuth(true);
-          return {
-            synced: false,
-            reason: "needs_auth",
-            message: "Google session expired. Please sign in again to resume syncing.",
-          };
         }
-        return {
-          synced: false,
-          reason: "error",
-          message:
-            err instanceof Error
-              ? err.message
-              : "Could not write submission to Google Sheets.",
-        };
+        return { synced: false };
       }
     },
     [accessToken, connection],

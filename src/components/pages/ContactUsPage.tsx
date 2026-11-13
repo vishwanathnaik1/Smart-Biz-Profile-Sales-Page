@@ -2,12 +2,10 @@ import { useState, type FormEvent } from "react";
 import {
   Briefcase,
   Check,
-  CheckCircle2,
   Clock,
   Copy,
   CreditCard,
   ExternalLink,
-  FileSpreadsheet,
   Headset,
   HelpCircle,
   Mail,
@@ -16,7 +14,7 @@ import {
   Send,
   Wrench,
 } from "lucide-react";
-import { useGoogleSheets, type SheetSyncResult } from "../../context/GoogleSheetsContext";
+import { useGoogleSheets } from "../../context/GoogleSheetsContext";
 import {
   CONTACT_SUBJECT_OPTIONS,
   buildContactMessage,
@@ -67,8 +65,7 @@ const ENQUIRY_CHANNELS = [
 ] as const;
 
 export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
-  const { connection, accessToken, needsAuth, openSheetsModal, syncFormSubmission } =
-    useGoogleSheets();
+  const { syncFormSubmission } = useGoogleSheets();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -79,10 +76,7 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedUrl, setSubmittedUrl] = useState<string | null>(null);
   const [submittedMessage, setSubmittedMessage] = useState("");
-  const [sheetResult, setSheetResult] = useState<SheetSyncResult | null>(null);
   const [copied, setCopied] = useState(false);
-
-  const isSheetActive = Boolean(connection && accessToken && !needsAuth);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -98,7 +92,7 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
     const whatsappUrl = buildContactWhatsAppUrl(payload);
 
     setIsSubmitting(true);
-    const syncOutcome = await syncFormSubmission({
+    await syncFormSubmission({
       formType: "Contact Us Enquiry",
       name: payload.name,
       email: payload.email,
@@ -109,7 +103,6 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
     });
     setIsSubmitting(false);
 
-    setSheetResult(syncOutcome);
     setSubmittedUrl(whatsappUrl);
     setSubmittedMessage(customMessage);
     triggerWhatsAppRedirect(whatsappUrl);
@@ -129,7 +122,6 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
   const handleReset = () => {
     setSubmittedUrl(null);
     setSubmittedMessage("");
-    setSheetResult(null);
     setCopied(false);
     setErrors({});
   };
@@ -208,30 +200,6 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
             Fill out the form below to prepare your enquiry and send it directly to our team on
             WhatsApp.
           </p>
-
-          {/* Compact Google Sheets Sync Bar */}
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[oklch(98%_0.012_252)] px-3.5 py-2.5 text-xs">
-            <div className="flex min-w-0 items-center gap-2">
-              <FileSpreadsheet
-                className={`h-4 w-4 shrink-0 ${isSheetActive ? "text-emerald-600" : "text-[var(--primary)]"}`}
-                aria-hidden="true"
-              />
-              <span className="truncate font-medium text-[var(--foreground)]">
-                {isSheetActive && connection
-                  ? `Syncing enquiries to: ${connection.spreadsheetTitle}`
-                  : connection
-                    ? "Reconnect Google to sync enquiries"
-                    : "Google Sheet not connected"}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={openSheetsModal}
-              className="shrink-0 font-semibold text-[var(--primary)] hover:underline cursor-pointer"
-            >
-              {isSheetActive ? "Manage" : "Connect Sheet"}
-            </button>
-          </div>
 
           {!submittedUrl ? (
             <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
@@ -376,27 +344,14 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
                 className="w-full sm:w-auto"
               >
                 <Send className="h-4 w-4" aria-hidden="true" />
-                {isSubmitting ? "Saving & Opening WhatsApp..." : "Submit Enquiry"}
+                {isSubmitting ? "Opening WhatsApp..." : "Submit Enquiry"}
               </Button>
             </form>
           ) : (
             <div className="mt-5 space-y-4 rounded-2xl border border-[var(--border)] bg-[oklch(97.5%_0.015_252)] p-5">
-              {sheetResult?.synced && (
-                <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-                  Saved to Google Sheet ({connection?.spreadsheetTitle})
-                </div>
-              )}
-
-              {sheetResult && !sheetResult.synced && sheetResult.reason === "error" && (
-                <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-900">
-                  Sheet sync note: {sheetResult.message}
-                </p>
-              )}
-
               <div>
                 <p className="font-display text-sm font-bold text-[var(--foreground)]">
-                  Your enquiry message is ready to send (+91 8329410074)
+                  Your enquiry message is ready to send
                 </p>
                 <p className="mt-1 text-xs text-[var(--muted-foreground)]">
                   Click below to open WhatsApp directly with your pre-filled message, or copy the
