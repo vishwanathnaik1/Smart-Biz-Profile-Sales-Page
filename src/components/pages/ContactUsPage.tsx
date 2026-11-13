@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from "react";
 import {
   Briefcase,
-  Check,
+  CheckCircle2,
   Clock,
-  Copy,
   CreditCard,
   ExternalLink,
   Headset,
@@ -73,12 +72,9 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
   const [subject, setSubject] = useState<string>(CONTACT_SUBJECT_OPTIONS[0]);
   const [message, setMessage] = useState("");
   const [errors, setErrors] = useState<ContactFormErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submittedUrl, setSubmittedUrl] = useState<string | null>(null);
-  const [submittedMessage, setSubmittedMessage] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [submittedNotice, setSubmittedNotice] = useState(false);
 
-  const handleSubmit = async (event: FormEvent) => {
+  const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     const payload = { name, email, phone, subject, message };
     const nextErrors = validateContactForm(payload);
@@ -91,8 +87,7 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
     const customMessage = buildContactMessage(payload);
     const whatsappUrl = buildContactWhatsAppUrl(payload);
 
-    setIsSubmitting(true);
-    await syncFormSubmission({
+    void syncFormSubmission({
       formType: "Contact Us Enquiry",
       name: payload.name,
       email: payload.email,
@@ -101,29 +96,15 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
       notesOrMessage: payload.message,
       whatsappMessage: customMessage,
     });
-    setIsSubmitting(false);
 
-    setSubmittedUrl(whatsappUrl);
-    setSubmittedMessage(customMessage);
     triggerWhatsAppRedirect(whatsappUrl);
-  };
 
-  const handleCopy = async () => {
-    if (!submittedMessage) return;
-    try {
-      await navigator.clipboard.writeText(submittedMessage);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard API unavailable in restricted context
-    }
-  };
-
-  const handleReset = () => {
-    setSubmittedUrl(null);
-    setSubmittedMessage("");
-    setCopied(false);
+    setName("");
+    setEmail("");
+    setPhone("");
+    setMessage("");
     setErrors({});
+    setSubmittedNotice(true);
   };
 
   const selectChannel = (nextSubject: string) => {
@@ -201,8 +182,14 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
             WhatsApp.
           </p>
 
-          {!submittedUrl ? (
-            <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
+          {submittedNotice && (
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+              Thank you! Your enquiry has been submitted.
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label
@@ -336,73 +323,11 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
                 )}
               </div>
 
-              <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                disabled={isSubmitting}
-                className="w-full sm:w-auto"
-              >
+              <Button type="submit" variant="primary" size="lg" className="w-full sm:w-auto">
                 <Send className="h-4 w-4" aria-hidden="true" />
-                {isSubmitting ? "Opening WhatsApp..." : "Submit Enquiry"}
+                Submit Enquiry
               </Button>
             </form>
-          ) : (
-            <div className="mt-5 space-y-4 rounded-2xl border border-[var(--border)] bg-[oklch(97.5%_0.015_252)] p-5">
-              <div>
-                <p className="font-display text-sm font-bold text-[var(--foreground)]">
-                  Your enquiry message is ready to send
-                </p>
-                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
-                  Click below to open WhatsApp directly with your pre-filled message, or copy the
-                  enquiry summary.
-                </p>
-              </div>
-
-              <pre className="whitespace-pre-wrap rounded-xl border border-[var(--border)] bg-white p-3.5 font-sans text-xs leading-relaxed text-[var(--foreground)]">
-                {submittedMessage}
-              </pre>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <a
-                  href={submittedUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[var(--success)] px-5 text-xs font-bold text-[var(--success-foreground)] shadow-xs transition-all hover:brightness-95"
-                >
-                  <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                  Send via WhatsApp
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                </a>
-
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="inline-flex h-11 items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-white px-4 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--secondary)] cursor-pointer"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-3.5 w-3.5 text-[var(--success)]" aria-hidden="true" />
-                      Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                      Copy Message
-                    </>
-                  )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="inline-flex h-11 items-center px-3 text-xs font-semibold text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
-                >
-                  Edit Enquiry
-                </button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Direct Contact Details Card */}

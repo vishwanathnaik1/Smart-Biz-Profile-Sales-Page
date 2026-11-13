@@ -5,6 +5,7 @@ import {
   buildSheetSubmissionRow,
   escapeSheetTitle,
   extractSpreadsheetId,
+  formatAsiaKolkataTimestamp,
 } from "./googleSheets";
 
 test("extractSpreadsheetId parses full Google Sheets URLs and raw IDs", () => {
@@ -27,7 +28,22 @@ test("escapeSheetTitle safely quotes tab names with spaces and apostrophes", () 
   assert.equal(escapeSheetTitle("Vishu's Leads"), "'Vishu''s Leads'");
 });
 
-test("buildSheetSubmissionRow formats Claim Smart Biz Profile submissions cleanly", () => {
+test("formatAsiaKolkataTimestamp converts UTC dates to Asia/Kolkata (+05:30)", () => {
+  assert.equal(
+    formatAsiaKolkataTimestamp("2026-11-13T14:15:00.000Z"),
+    "13/11/2026, 07:45:00 PM IST",
+  );
+  assert.equal(
+    formatAsiaKolkataTimestamp("2026-11-13T19:00:00.000Z"),
+    "14/11/2026, 12:30:00 AM IST",
+  );
+  assert.equal(
+    formatAsiaKolkataTimestamp("13/11/2026, 07:45:00 PM IST"),
+    "13/11/2026, 07:45:00 PM IST",
+  );
+});
+
+test("buildSheetSubmissionRow formats Claim Smart Biz Profile submissions cleanly in Asia/Kolkata", () => {
   const row = buildSheetSubmissionRow({
     formType: "Claim Smart Biz Profile",
     name: " Vishwanath Naik ",
@@ -42,7 +58,7 @@ test("buildSheetSubmissionRow formats Claim Smart Biz Profile submissions cleanl
 
   assert.equal(row.length, SHEET_HEADER_ROW.length);
   assert.deepEqual(row, [
-    "2026-11-13T14:15:00.000Z",
+    "13/11/2026, 07:45:00 PM IST",
     "Claim Smart Biz Profile",
     "Vishwanath Naik",
     "vishunaik1229@gmail.com",

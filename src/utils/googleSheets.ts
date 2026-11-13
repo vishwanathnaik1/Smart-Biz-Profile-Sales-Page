@@ -62,8 +62,34 @@ export function escapeSheetTitle(sheetTitle: string): string {
   return `'${cleaned.replace(/'/g, "''")}'`;
 }
 
+export const ASIA_KOLKATA_TIME_ZONE = "Asia/Kolkata";
+
+export function formatAsiaKolkataTimestamp(input: Date | string = new Date()): string {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    return typeof input === "string" ? input : "";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-IN", {
+    timeZone: ASIA_KOLKATA_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h12",
+  }).formatToParts(date);
+
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  const dayPeriod = get("dayPeriod").toUpperCase();
+
+  return `${get("day")}/${get("month")}/${get("year")}, ${get("hour")}:${get("minute")}:${get("second")} ${dayPeriod} IST`;
+}
+
 export function buildSheetSubmissionRow(entry: FormSubmissionEntry): string[] {
-  const timestamp = entry.submittedAt ?? new Date().toISOString();
+  const timestamp = formatAsiaKolkataTimestamp(entry.submittedAt ?? new Date());
   return [
     timestamp,
     entry.formType,
@@ -188,6 +214,7 @@ export async function submitFormToBackend(
 
   const res = await fetch("/api/submissions", {
     method: "POST",
+    keepalive: true,
     headers,
     body: JSON.stringify({
       ...entry,

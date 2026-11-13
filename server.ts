@@ -4,9 +4,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  ASIA_KOLKATA_TIME_ZONE,
   SHEET_HEADER_ROW,
   buildSheetSubmissionRow,
   escapeSheetTitle,
+  formatAsiaKolkataTimestamp,
   type ConnectedSheetConfig,
   type FormSubmissionEntry,
 } from "./src/utils/googleSheets.ts";
@@ -282,7 +284,11 @@ async function startServer() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        properties: { title },
+        properties: {
+          title,
+          timeZone: ASIA_KOLKATA_TIME_ZONE,
+          locale: "en_IN",
+        },
         sheets: [
           {
             properties: {
@@ -358,7 +364,7 @@ async function startServer() {
       return;
     }
 
-    const submittedAt = new Date().toISOString();
+    const submittedAt = formatAsiaKolkataTimestamp(new Date());
     const entry: FormSubmissionEntry = {
       formType,
       name: name.trim(),
