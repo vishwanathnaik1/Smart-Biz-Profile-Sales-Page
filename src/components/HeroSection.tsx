@@ -18,21 +18,25 @@ export function HeroSection({ onOpenModal }: HeroSectionProps) {
     <section id="top" className="hero-mesh relative overflow-hidden pt-10 pb-16 sm:pt-14 sm:pb-24">
       <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:px-8">
         <div className="flex flex-col items-center text-center">
-          <p className="inline-flex items-center gap-2 rounded-full border border-[oklch(82%_0.08_15/0.6)] bg-white/85 px-3.5 py-1.5 text-[11px] font-bold tracking-wider text-[oklch(48%_0.18_18)] uppercase shadow-xs backdrop-blur-xs">
+          <p className="inline-flex items-center gap-2 rounded-full border border-[oklch(70%_0.15_148/0.75)] bg-white/90 px-3.5 py-1.5 text-[11px] font-bold tracking-wider text-[oklch(45%_0.17_148)] uppercase shadow-xs backdrop-blur-xs">
             <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            Don&apos;t Lose Interested Customers Anymore
+            Turn Your Instagram Visitors Into Paying Customers
           </p>
 
-          <h1 className="mt-5 font-sans text-center text-4xl font-bold leading-[1.08] tracking-tight text-[var(--foreground)] sm:text-5xl lg:text-[54px]">
-            Turn Your <span className="font-bold text-[var(--primary)]">Instagram</span> Visitors Into{" "}
-            <span className="font-bold text-[var(--success)]">Paying Customers</span> - With One{" "}
-            <span className="text-gradient-primary-cyan font-bold">Smart Business Profile</span>
+          <h1 className="font-montserrat mt-5 text-center text-3xl font-extrabold leading-[1.12] tracking-tight text-[var(--foreground)] sm:text-5xl lg:text-[50px]">
+            <span className="text-[oklch(53%_0.22_22)]">Stop Losing</span>{" "}
+            <span className="text-[var(--primary)]">Interested Customers</span>{" "}
+            Between Your{" "}
+            <span className="bg-gradient-to-r from-[#D62976] via-[#E1306C] to-[#F56040] bg-clip-text text-transparent">
+              Instagram Profile
+            </span>{" "}
+            and <span className="text-[oklch(52%_0.18_148)]">WhatsApp.</span>
           </h1>
 
           <p className="mx-auto mt-5 max-w-xl text-center text-base leading-relaxed text-[var(--muted-foreground)] sm:text-[17px]">
-            Stop sending potential clients to a confusing Instagram profile. Give them one
-            professional place to discover your services, products, testimonials, contact details
-            and WhatsApp.
+            Give potential customers one professional place to explore your services, products,
+            photos, testimonials and business information before connecting with you directly on
+            WhatsApp.
           </p>
 
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3.5">
@@ -42,7 +46,15 @@ export function HeroSection({ onOpenModal }: HeroSectionProps) {
             </Button>
 
             <a
-              href="#difference"
+              href="#how-it-works"
+              onClick={(e) => {
+                const target = document.getElementById("how-it-works");
+                if (target) {
+                  e.preventDefault();
+                  window.history.pushState({}, "", "#how-it-works");
+                  target.scrollIntoView({ behavior: "smooth" });
+                }
+              }}
               className="inline-flex h-12 items-center gap-2 rounded-full border border-[var(--border-strong)] bg-white/80 px-6 text-sm font-semibold text-[var(--foreground)] shadow-xs transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
             >
               See how it works
@@ -74,7 +86,7 @@ export function HeroSection({ onOpenModal }: HeroSectionProps) {
                 <div className="flex items-center gap-3">
                   <img
                     src="/assets/smart-biz-owner.jpg"
-                    alt="Indian small business owner"
+                    alt="Small business owner showcasing services on Smart Business Profile"
                     className="h-12 w-12 rounded-full border-2 border-[var(--secondary)] object-cover"
                   />
                   <div>

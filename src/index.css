@@ -68,3 +68,8 @@
   background-clip: text;
   color: transparent;
 }
+
+.font-montserrat {
+  font-family: "Montserrat", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+}

@@ -35,6 +35,11 @@ export const FEATURES = [
     description: "Display products in an easy-to-browse online store.",
   },
   {
+    id: "booking",
+    title: "Appointment Booking",
+    description: "Let clients pick a date, time slot and book in seconds.",
+  },
+  {
     id: "whatsapp",
     title: "WhatsApp Integration",
     description: "Let customers connect with you directly.",
@@ -57,7 +62,7 @@ export const FEATURES = [
   {
     id: "link",
     title: "One Shareable Link",
-    description: "Share it on Instagram, WhatsApp, Facebook and cards.",
+    description: "Share your Smart Business Profile on Instagram, WhatsApp and Google.",
   },
 ] as const;
 
@@ -112,42 +117,105 @@ export const WHATS_INCLUDED = [
   "Social Media Links",
   "Shareable Business URL",
   "Mobile-Friendly Design",
+  "Contact Form",
+  "Unlimited Enquiries",
+  "Custom Domain",
+  "Progressive Web App (PWA)",
+  "Visitor Analytics",
+  "Free Setup",
+  "Free Support",
 ] as const;
 
 export const FAQ_ITEMS = [
   {
     id: "technical",
     question: "Do I need technical knowledge?",
-    answer: "No. Smart Biz Profile is designed to be simple and easy to use without coding.",
+    answer:
+      "Not at all! Smart Biz Profile is designed to be easy to use. You don't need coding or web development skills. We also provide professional setup assistance to help you get started.",
   },
   {
     id: "instagram",
     question: "Can I use it with Instagram?",
     answer:
-      "Yes. Add your Smart Biz Profile link to your Instagram bio and direct your audience to one central destination.",
+      "Absolutely! Simply add your Smart Biz Profile link to your Instagram bio. When someone visits your profile, they can explore your services, products, photos, testimonials and contact information in one place.",
+  },
+  {
+    id: "suitable-business",
+    question: "Is Smart Biz Profile suitable for my business?",
+    answer:
+      "Yes! Smart Biz Profile is suitable for tarot readers, healers, astrologers, coaches, wellness professionals, salons, resorts, freelancers, product sellers and other small businesses.",
   },
   {
     id: "services",
     question: "Can I showcase my services?",
-    answer: "Yes. You can create sections for your services, packages and other business information.",
+    answer:
+      "Yes! You can display your services and packages with images, descriptions and pricing, helping potential customers understand exactly what you offer.",
   },
   {
     id: "products",
     question: "Can I showcase products?",
     answer:
-      "Yes. Use the store functionality to showcase products and let customers connect through WhatsApp.",
+      "Absolutely! You can create an attractive product catalogue with product images, names, descriptions, prices and categories, making it easy for customers to browse your collection.",
   },
   {
     id: "whatsapp",
-    question: "Can I use WhatsApp?",
+    question: "Can customers contact me through WhatsApp?",
     answer:
-      "Yes. Your profile makes it easy for visitors to connect with your business through WhatsApp.",
+      "Yes! Your Smart Biz Profile includes WhatsApp contact functionality, allowing visitors to connect with your business directly for enquiries and orders.",
+  },
+  {
+    id: "gallery",
+    question: "Can I add photos and videos?",
+    answer:
+      "Yes! You can showcase your business photographs, products, services, portfolio and videos through the gallery section to give potential customers a better understanding of your business.",
+  },
+  {
+    id: "testimonials",
+    question: "Can I display customer testimonials?",
+    answer:
+      "Yes! You can showcase customer testimonials and positive experiences to build credibility and help potential customers feel more confident about choosing your business.",
+  },
+  {
+    id: "update-later",
+    question: "Can I update my profile later?",
+    answer:
+      "Yes! You can manage and update your business profile content, services, products and other available information as your business grows and changes.",
+  },
+  {
+    id: "setup-time",
+    question: "How long does setup take?",
+    answer:
+      "The setup timeline depends on the information, images and content required for your profile. Once we receive the necessary details, our team will help you get your Smart Biz Profile ready.",
+  },
+  {
+    id: "setup-assistance",
+    question: "Do you provide setup assistance?",
+    answer:
+      "Yes! Professional setup assistance is included with applicable setup offers. We help organize your business information, services, products and other profile content so you can get started confidently.",
+  },
+  {
+    id: "share-social",
+    question: "Can I share my profile on social media?",
+    answer:
+      "Absolutely! Your Smart Biz Profile comes with one shareable business URL. Share it on Instagram, WhatsApp, Facebook, email signatures, QR codes and printed materials.",
+  },
+  {
+    id: "store-orders",
+    question: "Can customers place orders through my store?",
+    answer:
+      "Yes! Customers can browse your products and send order enquiries directly through WhatsApp. You can communicate with customers and manage orders directly. Please note that integrated online payment processing is not currently available in the WhatsApp store.",
   },
   {
     id: "website",
     question: "Do I need a traditional website?",
     answer:
-      "No. Smart Biz Profile gives you a professional online business presence without building a traditional website from scratch.",
+      "No! Smart Biz Profile gives you a complete, mobile-friendly Smart Business Profile where customers can explore your business, services, products, booking options, testimonials and contact details without the complexity of building a traditional website.",
+  },
+  {
+    id: "mobile",
+    question: "Does it work on mobile phones?",
+    answer:
+      "Absolutely! Smart Biz Profile is designed to be mobile-friendly and accessible across smartphones, tablets and desktop computers, giving your customers a smooth browsing experience wherever they are.",
   },
 ] as const;
 

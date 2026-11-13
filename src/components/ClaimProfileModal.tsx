@@ -1,9 +1,20 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Check, Clock, Copy, ExternalLink, MessageCircle, X } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  Clock,
+  Copy,
+  ExternalLink,
+  FileSpreadsheet,
+  MessageCircle,
+  X,
+} from "lucide-react";
+import { useGoogleSheets, type SheetSyncResult } from "../context/GoogleSheetsContext";
 import { BUSINESS_TYPES } from "../data/landingData";
 import {
   buildWhatsAppMessage,
   buildWhatsAppUrl,
+  triggerWhatsAppRedirect,
   validateLeadForm,
   type LeadValidationErrors,
 } from "../utils/whatsapp";
@@ -15,12 +26,18 @@ interface ClaimProfileModalProps {
 }
 
 export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
+  const { connection, accessToken, needsAuth, openSheetsModal, syncFormSubmission } =
+    useGoogleSheets();
+
   const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [businessType, setBusinessType] = useState("");
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [errors, setErrors] = useState<LeadValidationErrors>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedUrl, setSubmittedUrl] = useState<string | null>(null);
   const [submittedMessage, setSubmittedMessage] = useState<string>("");
+  const [sheetResult, setSheetResult] = useState<SheetSyncResult | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -38,18 +55,35 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
 
   if (!open) return null;
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const nextErrors = validateLeadForm({ name, businessType, whatsappNumber });
+    const payload = { name, email, businessType, whatsappNumber };
+    const nextErrors = validateLeadForm(payload);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
       return;
     }
 
-    const payload = { name, businessType, whatsappNumber };
-    setSubmittedUrl(buildWhatsAppUrl(payload));
-    setSubmittedMessage(buildWhatsAppMessage(payload));
+    const message = buildWhatsAppMessage(payload);
+    const whatsappUrl = buildWhatsAppUrl(payload);
+
+    setIsSubmitting(true);
+    const syncOutcome = await syncFormSubmission({
+      formType: "Claim Smart Biz Profile",
+      name: payload.name,
+      email: payload.email,
+      categoryOrSubject: payload.businessType,
+      phone: payload.whatsappNumber,
+      notesOrMessage: "Smart Biz Profile setup request",
+      whatsappMessage: message,
+    });
+    setIsSubmitting(false);
+
+    setSheetResult(syncOutcome);
+    setSubmittedUrl(whatsappUrl);
+    setSubmittedMessage(message);
+    triggerWhatsAppRedirect(whatsappUrl);
   };
 
   const handleCopyMessage = async () => {
@@ -66,9 +100,12 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
   const handleReset = () => {
     setSubmittedUrl(null);
     setSubmittedMessage("");
+    setSheetResult(null);
     setCopied(false);
     setErrors({});
   };
+
+  const isSheetActive = Boolean(connection && accessToken && !needsAuth);
 
   return (
     <div
@@ -81,7 +118,7 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="claim-modal-title"
-        className="relative w-full max-w-[440px] rounded-2xl border border-[var(--border)] bg-white p-6 shadow-2xl sm:p-7"
+        className="relative max-h-[92vh] w-full max-w-[460px] overflow-y-auto rounded-2xl border border-[var(--border)] bg-white p-6 shadow-2xl sm:p-7"
       >
         <button
           type="button"
@@ -107,8 +144,32 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
           Fill this in and we&apos;ll continue on WhatsApp — it takes less than 30 seconds.
         </p>
 
+        {/* Compact Google Sheets Sync Bar */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[oklch(98%_0.012_252)] px-3.5 py-2.5 text-xs">
+          <div className="flex min-w-0 items-center gap-2">
+            <FileSpreadsheet
+              className={`h-4 w-4 shrink-0 ${isSheetActive ? "text-emerald-600" : "text-[var(--primary)]"}`}
+              aria-hidden="true"
+            />
+            <span className="truncate font-medium text-[var(--foreground)]">
+              {isSheetActive && connection
+                ? `Syncing to: ${connection.spreadsheetTitle}`
+                : connection
+                  ? "Reconnect Google to sync leads"
+                  : "Google Sheet not connected"}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={openSheetsModal}
+            className="shrink-0 font-semibold text-[var(--primary)] hover:underline cursor-pointer"
+          >
+            {isSheetActive ? "Manage" : "Connect Sheet"}
+          </button>
+        </div>
+
         {!submittedUrl ? (
-          <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="mt-4 space-y-3.5">
             <div>
               <label
                 htmlFor="lead-name"
@@ -131,6 +192,31 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
               {errors.name && (
                 <p role="alert" className="mt-1 text-xs font-medium text-[var(--destructive)]">
                   {errors.name}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="lead-email"
+                className="block text-xs font-semibold text-[var(--foreground)]"
+              >
+                Email address
+              </label>
+              <input
+                id="lead-email"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+                }}
+                placeholder="you@business.com"
+                className="mt-1.5 h-11 w-full rounded-xl border border-[var(--input)] bg-white px-3.5 text-sm text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted-foreground)]/65 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
+              />
+              {errors.email && (
+                <p role="alert" className="mt-1 text-xs font-medium text-[var(--destructive)]">
+                  {errors.email}
                 </p>
               )}
             </div>
@@ -194,9 +280,15 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
               )}
             </div>
 
-            <Button type="submit" variant="primary" size="lg" className="mt-2 w-full">
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              disabled={isSubmitting}
+              className="mt-2 w-full"
+            >
               <MessageCircle className="h-4 w-4" aria-hidden="true" />
-              Continue on WhatsApp
+              {isSubmitting ? "Saving & Opening WhatsApp..." : "Continue on WhatsApp"}
             </Button>
 
             <p className="text-center text-xs text-[var(--muted-foreground)]">
@@ -205,9 +297,22 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
           </form>
         ) : (
           <div className="mt-5 space-y-4">
+            {sheetResult?.synced && (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
+                Saved to Google Sheet ({connection?.spreadsheetTitle})
+              </div>
+            )}
+
+            {sheetResult && !sheetResult.synced && sheetResult.reason === "error" && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2 text-xs font-medium text-amber-900">
+                Sheet sync note: {sheetResult.message}
+              </p>
+            )}
+
             <div className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4">
               <p className="text-xs font-semibold text-[var(--foreground)]">
-                Your WhatsApp message is ready:
+                Your customized WhatsApp message (+91 8329410074):
               </p>
               <p className="mt-1.5 text-xs leading-relaxed text-[var(--muted-foreground)]">
                 {submittedMessage}
