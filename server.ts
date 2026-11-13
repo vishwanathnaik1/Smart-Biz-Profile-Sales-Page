@@ -7,6 +7,7 @@ import {
   ASIA_KOLKATA_TIME_ZONE,
   SHEET_HEADER_ROW,
   buildSheetSubmissionRow,
+  buildWebhookRequest,
   escapeSheetTitle,
   formatAsiaKolkataTimestamp,
   type ConnectedSheetConfig,
@@ -98,17 +99,39 @@ async function appendRowViaSheetsApi(
 async function forwardViaWebhook(
   webhookUrl: string,
   entry: FormSubmissionEntry,
+  options?: {
+    spreadsheetId?: string;
+    sheetTitle?: string;
+  },
 ): Promise<boolean> {
+  const req = buildWebhookRequest(webhookUrl, entry, options);
   try {
-    const res = await fetch(webhookUrl, {
+    const res = await fetch(req.url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...entry,
-        row: buildSheetSubmissionRow(entry),
-      }),
+      body: JSON.stringify(req.payload),
+      redirect: "follow",
     });
-    return res.ok;
+    if (res.ok) {
+      const text = await res.text().catch(() => "");
+      if (!text) return true;
+      try {
+        const parsed = JSON.parse(text) as { status?: string; ok?: boolean };
+        if (parsed.status !== "error" && parsed.ok !== false) {
+          return true;
+        }
+      } catch {
+        return true;
+      }
+    }
+
+    const formRes = await fetch(req.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: req.formBody,
+      redirect: "follow",
+    });
+    return formRes.ok;
   } catch {
     return false;
   }
@@ -399,7 +422,10 @@ async function startServer() {
 
     const webhookUrl = process.env.GOOGLE_SHEETS_WEBHOOK_URL?.trim();
     if (!syncedToSheet && webhookUrl) {
-      syncedToSheet = await forwardViaWebhook(webhookUrl, entry);
+      syncedToSheet = await forwardViaWebhook(webhookUrl, entry, {
+        spreadsheetId: targetSpreadsheetId,
+        sheetTitle: targetSheetTitle,
+      });
     }
 
     const record: StoredSubmission = {

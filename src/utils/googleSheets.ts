@@ -102,6 +102,107 @@ export function buildSheetSubmissionRow(entry: FormSubmissionEntry): string[] {
   ];
 }
 
+function getViteEnvValue(key: string): string {
+  const env = (import.meta as { env?: Record<string, string | undefined> }).env;
+  return env?.[key]?.trim() ?? "";
+}
+
+export function getConfiguredWebhookUrl(): string {
+  return getViteEnvValue("VITE_GOOGLE_SHEETS_WEBHOOK_URL");
+}
+
+export function getConfiguredSpreadsheetId(): string {
+  return getViteEnvValue("VITE_GOOGLE_SPREADSHEET_ID");
+}
+
+export function getConfiguredSheetTab(): string {
+  return getViteEnvValue("VITE_GOOGLE_SHEET_TAB") || "Form Submissions";
+}
+
+export interface WebhookRequestData {
+  url: string;
+  payload: {
+    formType: FormSubmissionType;
+    name: string;
+    email: string;
+    categoryOrSubject: string;
+    phone: string;
+    notesOrMessage: string;
+    whatsappMessage: string;
+    submittedAt: string;
+    spreadsheetId: string;
+    sheetTitle: string;
+    row: string[];
+  };
+  formBody: string;
+}
+
+export function buildWebhookRequest(
+  webhookUrl: string,
+  entry: FormSubmissionEntry,
+  options?: {
+    spreadsheetId?: string;
+    sheetTitle?: string;
+  },
+): WebhookRequestData {
+  const submittedAt = formatAsiaKolkataTimestamp(entry.submittedAt ?? new Date());
+  const spreadsheetId = options?.spreadsheetId?.trim() || "";
+  const sheetTitle = options?.sheetTitle?.trim() || "Form Submissions";
+  const normalizedEntry: FormSubmissionEntry = {
+    formType: entry.formType,
+    name: entry.name.trim(),
+    email: entry.email.trim(),
+    categoryOrSubject: entry.categoryOrSubject.trim(),
+    phone: entry.phone.trim(),
+    notesOrMessage: entry.notesOrMessage.trim(),
+    whatsappMessage: entry.whatsappMessage.trim(),
+    submittedAt,
+  };
+  const row = buildSheetSubmissionRow(normalizedEntry);
+
+  const flatParams: Record<string, string> = {
+    submittedAt,
+    formType: normalizedEntry.formType,
+    name: normalizedEntry.name,
+    email: normalizedEntry.email,
+    categoryOrSubject: normalizedEntry.categoryOrSubject,
+    phone: normalizedEntry.phone,
+    notesOrMessage: normalizedEntry.notesOrMessage,
+    whatsappMessage: normalizedEntry.whatsappMessage,
+  };
+  if (spreadsheetId) {
+    flatParams.spreadsheetId = spreadsheetId;
+  }
+  if (sheetTitle) {
+    flatParams.sheetTitle = sheetTitle;
+  }
+
+  const targetUrl = new URL(webhookUrl);
+  for (const [key, value] of Object.entries(flatParams)) {
+    if (!targetUrl.searchParams.has(key)) {
+      targetUrl.searchParams.set(key, value);
+    }
+  }
+
+  return {
+    url: targetUrl.toString(),
+    payload: {
+      formType: normalizedEntry.formType,
+      name: normalizedEntry.name,
+      email: normalizedEntry.email,
+      categoryOrSubject: normalizedEntry.categoryOrSubject,
+      phone: normalizedEntry.phone,
+      notesOrMessage: normalizedEntry.notesOrMessage,
+      whatsappMessage: normalizedEntry.whatsappMessage,
+      submittedAt,
+      spreadsheetId,
+      sheetTitle,
+      row,
+    },
+    formBody: new URLSearchParams(flatParams).toString(),
+  };
+}
+
 export class SheetsApiError extends Error {
   status: number;
 
@@ -203,8 +304,14 @@ export async function submitFormToBackend(
   options?: {
     accessToken?: string | null;
     sheetConfig?: ConnectedSheetConfig | null;
+    webhookUrl?: string;
   },
 ): Promise<{ ok: boolean; syncedToSheet: boolean; submittedAt: string }> {
+  const submittedAt = formatAsiaKolkataTimestamp(entry.submittedAt ?? new Date());
+  const normalizedEntry: FormSubmissionEntry = {
+    ...entry,
+    submittedAt,
+  };
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -212,16 +319,66 @@ export async function submitFormToBackend(
     headers.Authorization = `Bearer ${options.accessToken}`;
   }
 
-  const res = await fetch("/api/submissions", {
-    method: "POST",
-    keepalive: true,
-    headers,
-    body: JSON.stringify({
-      ...entry,
-      spreadsheetId: options?.sheetConfig?.spreadsheetId,
-      sheetTitle: options?.sheetConfig?.sheetTitle,
-    }),
-  });
+  let backendError: unknown = null;
+  try {
+    const res = await fetch("/api/submissions", {
+      method: "POST",
+      keepalive: true,
+      headers,
+      body: JSON.stringify({
+        ...normalizedEntry,
+        spreadsheetId: options?.sheetConfig?.spreadsheetId || getConfiguredSpreadsheetId(),
+        sheetTitle: options?.sheetConfig?.sheetTitle || getConfiguredSheetTab(),
+      }),
+    });
 
-  return parseBackendResponse<{ ok: boolean; syncedToSheet: boolean; submittedAt: string }>(res);
+    const contentType = res.headers.get("content-type") ?? "";
+    if (res.ok && contentType.includes("application/json")) {
+      const data = await res.json().catch(() => null);
+      if (data && typeof data === "object" && data.ok === true) {
+        return data as { ok: boolean; syncedToSheet: boolean; submittedAt: string };
+      }
+    }
+
+    if (res.status === 401) {
+      throw new SheetsApiError("Google OAuth session expired.", 401);
+    }
+
+    backendError = new SheetsApiError(
+      `Backend submission unavailable (${res.status}).`,
+      res.status,
+    );
+  } catch (err) {
+    if (err instanceof SheetsApiError && err.status === 401) {
+      throw err;
+    }
+    backendError = err;
+  }
+
+  const fallbackWebhookUrl = (options?.webhookUrl ?? getConfiguredWebhookUrl()).trim();
+  if (fallbackWebhookUrl) {
+    const webhookReq = buildWebhookRequest(fallbackWebhookUrl, normalizedEntry, {
+      spreadsheetId: options?.sheetConfig?.spreadsheetId || getConfiguredSpreadsheetId(),
+      sheetTitle: options?.sheetConfig?.sheetTitle || getConfiguredSheetTab(),
+    });
+
+    await fetch(webhookReq.url, {
+      method: "POST",
+      mode: "no-cors",
+      keepalive: true,
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(webhookReq.payload),
+    });
+
+    return {
+      ok: true,
+      syncedToSheet: true,
+      submittedAt,
+    };
+  }
+
+  if (backendError instanceof Error) {
+    throw backendError;
+  }
+  throw new SheetsApiError("Could not submit form.", 500);
 }
