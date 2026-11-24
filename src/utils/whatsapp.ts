@@ -1,8 +1,15 @@
+import {
+  DEFAULT_COUNTRY_CODE,
+  validatePhoneNumber,
+  type CountryCode,
+} from "./phone";
+
 export interface LeadFormValues {
   name: string;
   email: string;
   businessType: string;
   whatsappNumber: string;
+  countryCode?: CountryCode;
 }
 
 export interface LeadValidationErrors {
@@ -21,7 +28,6 @@ export function validateLeadForm(values: LeadFormValues): LeadValidationErrors {
   const trimmedName = values.name.trim();
   const trimmedEmail = values.email.trim();
   const trimmedType = values.businessType.trim();
-  const digits = values.whatsappNumber.replace(/\D/g, "");
 
   if (trimmedName.length < 2) {
     errors.name = "Please enter your name (at least 2 characters).";
@@ -35,8 +41,13 @@ export function validateLeadForm(values: LeadFormValues): LeadValidationErrors {
     errors.businessType = "Please choose your business type.";
   }
 
-  if (digits.length < 8 || digits.length > 15) {
-    errors.whatsappNumber = "Please enter a valid WhatsApp number with country or area code.";
+  const phoneCheck = validatePhoneNumber(
+    values.whatsappNumber,
+    values.countryCode ?? DEFAULT_COUNTRY_CODE,
+  );
+  if (!phoneCheck.isValid) {
+    errors.whatsappNumber =
+      phoneCheck.error ?? "Please enter a valid WhatsApp number.";
   }
 
   return errors;

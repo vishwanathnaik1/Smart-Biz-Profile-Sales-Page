@@ -1,3 +1,9 @@
+import {
+  DEFAULT_COUNTRY_CODE,
+  validatePhoneNumber,
+  type CountryCode,
+} from "./phone";
+
 export const CONTACT_WHATSAPP_PHONE = "918329410074";
 
 export const CONTACT_SUBJECT_OPTIONS = [
@@ -12,6 +18,7 @@ export interface ContactFormValues {
   name: string;
   email: string;
   phone: string;
+  countryCode?: CountryCode;
   subject: string;
   message: string;
 }
@@ -30,7 +37,6 @@ export function validateContactForm(values: ContactFormValues): ContactFormError
   const errors: ContactFormErrors = {};
   const trimmedName = values.name.trim();
   const trimmedEmail = values.email.trim();
-  const phoneDigits = values.phone.replace(/\D/g, "");
   const trimmedSubject = values.subject.trim();
   const trimmedMessage = values.message.trim();
 
@@ -42,8 +48,12 @@ export function validateContactForm(values: ContactFormValues): ContactFormError
     errors.email = "Please enter a valid email address.";
   }
 
-  if (phoneDigits.length < 8 || phoneDigits.length > 15) {
-    errors.phone = "Please enter a valid phone number with country or area code.";
+  const phoneCheck = validatePhoneNumber(
+    values.phone,
+    values.countryCode ?? DEFAULT_COUNTRY_CODE,
+  );
+  if (!phoneCheck.isValid) {
+    errors.phone = phoneCheck.error ?? "Please enter a valid phone number.";
   }
 
   if (!trimmedSubject) {

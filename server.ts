@@ -13,6 +13,7 @@ import {
   type ConnectedSheetConfig,
   type FormSubmissionEntry,
 } from "./src/utils/googleSheets.ts";
+import { validatePhoneNumber } from "./src/utils/phone.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
@@ -378,14 +379,16 @@ async function startServer() {
       sheetTitle,
     } = req.body ?? {};
 
+    const phoneValidation =
+      typeof phone === "string" ? validatePhoneNumber(phone) : { isValid: false };
+
     if (
       (formType !== "Claim Smart Biz Profile" && formType !== "Contact Us Enquiry") ||
       typeof name !== "string" ||
       name.trim().length < 2 ||
       typeof email !== "string" ||
       !email.includes("@") ||
-      typeof phone !== "string" ||
-      phone.replace(/\D/g, "").length < 8 ||
+      !phoneValidation.isValid ||
       typeof whatsappMessage !== "string" ||
       !whatsappMessage.trim()
     ) {

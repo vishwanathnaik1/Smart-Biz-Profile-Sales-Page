@@ -3,6 +3,11 @@ import { Clock, MessageCircle, X } from "lucide-react";
 import { useGoogleSheets } from "../context/GoogleSheetsContext";
 import { BUSINESS_TYPES } from "../data/landingData";
 import {
+  DEFAULT_COUNTRY_CODE,
+  formatPhoneForSubmission,
+  type CountryCode,
+} from "../utils/phone";
+import {
   buildWhatsAppMessage,
   buildWhatsAppUrl,
   triggerWhatsAppRedirect,
@@ -10,6 +15,7 @@ import {
   type LeadValidationErrors,
 } from "../utils/whatsapp";
 import { Button } from "./ui/Button";
+import { PhoneNumberInput } from "./ui/PhoneNumberInput";
 
 interface ClaimProfileModalProps {
   open: boolean;
@@ -22,6 +28,7 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [businessType, setBusinessType] = useState("");
+  const [countryCode, setCountryCode] = useState<CountryCode>(DEFAULT_COUNTRY_CODE);
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [errors, setErrors] = useState<LeadValidationErrors>({});
 
@@ -42,13 +49,22 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    const payload = { name, email, businessType, whatsappNumber };
-    const nextErrors = validateLeadForm(payload);
+    const rawPayload = { name, email, businessType, whatsappNumber, countryCode };
+    const nextErrors = validateLeadForm(rawPayload);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
       return;
     }
+
+    const formattedPhone = formatPhoneForSubmission(whatsappNumber, countryCode);
+    const payload = {
+      name,
+      email,
+      businessType,
+      whatsappNumber: formattedPhone,
+      countryCode,
+    };
 
     const message = buildWhatsAppMessage(payload);
     const whatsappUrl = buildWhatsAppUrl(payload);
@@ -58,7 +74,7 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
       name: payload.name,
       email: payload.email,
       categoryOrSubject: payload.businessType,
-      phone: payload.whatsappNumber,
+      phone: formattedPhone,
       notesOrMessage: "Smart Biz Profile setup request",
       whatsappMessage: message,
     });
@@ -68,6 +84,7 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
     setName("");
     setEmail("");
     setBusinessType("");
+    setCountryCode(DEFAULT_COUNTRY_CODE);
     setWhatsappNumber("");
     setErrors({});
     onClose();
@@ -201,18 +218,19 @@ export function ClaimProfileModal({ open, onClose }: ClaimProfileModalProps) {
             >
               Your WhatsApp number
             </label>
-            <input
+            <PhoneNumberInput
               id="lead-whatsapp"
-              type="tel"
+              country={countryCode}
               value={whatsappNumber}
-              onChange={(e) => {
-                setWhatsappNumber(e.target.value);
+              dropdownPlacement="top"
+              error={errors.whatsappNumber}
+              onChange={(nextValue, nextCountry) => {
+                setWhatsappNumber(nextValue);
+                setCountryCode(nextCountry);
                 if (errors.whatsappNumber) {
                   setErrors((prev) => ({ ...prev, whatsappNumber: undefined }));
                 }
               }}
-              placeholder="e.g. +91 98765 43210"
-              className="mt-1.5 h-11 w-full rounded-xl border border-[var(--input)] bg-white px-3.5 text-sm text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted-foreground)]/65 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
             />
             {errors.whatsappNumber && (
               <p role="alert" className="mt-1 text-xs font-medium text-[var(--destructive)]">

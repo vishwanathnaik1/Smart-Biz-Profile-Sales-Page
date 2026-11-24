@@ -16,15 +16,42 @@ test("validateLeadForm rejects empty or invalid fields with specific messages", 
   assert.ok(errors.whatsappNumber);
 });
 
-test("validateLeadForm accepts valid lead details including 10-digit WhatsApp numbers", () => {
+test("validateLeadForm accepts valid lead details including 10-digit Indian and international WhatsApp numbers", () => {
   const errors = validateLeadForm({
     name: "Vishwanath Naik",
     email: "vishunaik1229@gmail.com",
     businessType: "Freelancers & Consultants",
     whatsappNumber: "7507384721",
+    countryCode: "IN",
   });
-
   assert.deepEqual(errors, {});
+
+  const ukErrors = validateLeadForm({
+    name: "Vishwanath Naik",
+    email: "vishunaik1229@gmail.com",
+    businessType: "Freelancers & Consultants",
+    whatsappNumber: "7400 123456",
+    countryCode: "GB",
+  });
+  assert.deepEqual(ukErrors, {});
+
+  const fakeIndia = validateLeadForm({
+    name: "Vishwanath Naik",
+    email: "vishunaik1229@gmail.com",
+    businessType: "Freelancers & Consultants",
+    whatsappNumber: "1234567890",
+    countryCode: "IN",
+  });
+  assert.ok(fakeIndia.whatsappNumber);
+
+  const repeatedIndia = validateLeadForm({
+    name: "Vishwanath Naik",
+    email: "vishunaik1229@gmail.com",
+    businessType: "Freelancers & Consultants",
+    whatsappNumber: "9999999999",
+    countryCode: "IN",
+  });
+  assert.ok(repeatedIndia.whatsappNumber);
 });
 
 test("buildWhatsAppMessage formats trimmed user details accurately", () => {

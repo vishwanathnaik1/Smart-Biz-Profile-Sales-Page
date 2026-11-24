@@ -86,7 +86,7 @@ test("validateContactForm validates all required contact fields", () => {
   const valid = validateContactForm({
     name: "Riya Kapoor",
     email: "riya@example.com",
-    phone: "+91 98765 43210",
+    phone: "+91 98234 51678",
     subject: "Customer Support",
     message: "Need help updating my services list on Smart Biz Profile.",
   });
@@ -97,7 +97,7 @@ test("buildContactWhatsAppUrl builds properly formatted wa.me enquiry URL", () =
   const values = {
     name: "Riya Kapoor",
     email: "riya@example.com",
-    phone: "+91 98765 43210",
+    phone: "+91 98234 51678",
     subject: "Sales Enquiries",
     message: "Interested in setting up Smart Biz Profile for my salon.",
   };

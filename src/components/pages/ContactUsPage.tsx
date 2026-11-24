@@ -21,10 +21,16 @@ import {
   validateContactForm,
   type ContactFormErrors,
 } from "../../utils/contactForm";
+import {
+  DEFAULT_COUNTRY_CODE,
+  formatPhoneForSubmission,
+  type CountryCode,
+} from "../../utils/phone";
 import type { AppRoute } from "../../utils/routing";
 import { triggerWhatsAppRedirect } from "../../utils/whatsapp";
 import { LegalPageLayout } from "../LegalPageLayout";
 import { Button } from "../ui/Button";
+import { PhoneNumberInput } from "../ui/PhoneNumberInput";
 
 interface ContactUsPageProps {
   onNavigate: (route: AppRoute) => void;
@@ -68,6 +74,7 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [countryCode, setCountryCode] = useState<CountryCode>(DEFAULT_COUNTRY_CODE);
   const [phone, setPhone] = useState("");
   const [subject, setSubject] = useState<string>(CONTACT_SUBJECT_OPTIONS[0]);
   const [message, setMessage] = useState("");
@@ -76,13 +83,23 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    const payload = { name, email, phone, subject, message };
-    const nextErrors = validateContactForm(payload);
+    const rawPayload = { name, email, phone, countryCode, subject, message };
+    const nextErrors = validateContactForm(rawPayload);
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
       return;
     }
+
+    const formattedPhone = formatPhoneForSubmission(phone, countryCode);
+    const payload = {
+      name,
+      email,
+      phone: formattedPhone,
+      countryCode,
+      subject,
+      message,
+    };
 
     const customMessage = buildContactMessage(payload);
     const whatsappUrl = buildContactWhatsAppUrl(payload);
@@ -92,7 +109,7 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
       name: payload.name,
       email: payload.email,
       categoryOrSubject: payload.subject,
-      phone: payload.phone,
+      phone: formattedPhone,
       notesOrMessage: payload.message,
       whatsappMessage: customMessage,
     });
@@ -101,6 +118,7 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
 
     setName("");
     setEmail("");
+    setCountryCode(DEFAULT_COUNTRY_CODE);
     setPhone("");
     setMessage("");
     setErrors({});
@@ -250,16 +268,16 @@ export function ContactUsPage({ onNavigate }: ContactUsPageProps) {
                   >
                     Phone / WhatsApp Number
                   </label>
-                  <input
+                  <PhoneNumberInput
                     id="contact-phone"
-                    type="tel"
+                    country={countryCode}
                     value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value);
+                    error={errors.phone}
+                    onChange={(nextValue, nextCountry) => {
+                      setPhone(nextValue);
+                      setCountryCode(nextCountry);
                       if (errors.phone) setErrors((prev) => ({ ...prev, phone: undefined }));
                     }}
-                    placeholder="e.g. +91 98765 43210"
-                    className="mt-1.5 h-11 w-full rounded-xl border border-[var(--input)] bg-white px-3.5 text-sm text-[var(--foreground)] outline-none transition-colors placeholder:text-[var(--muted-foreground)]/65 focus:border-[var(--primary)] focus:ring-2 focus:ring-[var(--primary)]/20"
                   />
                   {errors.phone && (
                     <p role="alert" className="mt-1 text-xs font-medium text-[var(--destructive)]">
