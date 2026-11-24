@@ -4,6 +4,7 @@ import {
   SHEET_HEADER_ROW,
   buildSheetSubmissionRow,
   buildWebhookRequest,
+  escapeSheetCellValue,
   escapeSheetTitle,
   extractSpreadsheetId,
   formatAsiaKolkataTimestamp,
@@ -99,6 +100,30 @@ test("buildWebhookRequest preserves existing query params and populates JSON + p
   assert.equal(parsedUrl.searchParams.get("spreadsheetId"), "sheet-123");
   assert.equal(req.payload.row[0], "13/11/2026, 07:45:00 PM IST");
   assert.equal(req.payload.row[4], "Sales Enquiries");
+});
+
+test("escapeSheetCellValue and buildWebhookRequest prevent #ERROR! for + prefixed international phone numbers", () => {
+  assert.equal(escapeSheetCellValue("+91 75073 84721"), "'+91 75073 84721");
+  assert.equal(escapeSheetCellValue("'+91 75073 84721"), "'+91 75073 84721");
+  assert.equal(escapeSheetCellValue("=1+1"), "'=1+1");
+  assert.equal(escapeSheetCellValue("7507384721"), "7507384721");
+
+  const req = buildWebhookRequest("https://script.google.com/macros/s/abc123/exec?gid=0", {
+    formType: "Claim Smart Biz Profile",
+    name: "Vishwanath Naik",
+    email: "vishunaik1229@gmail.com",
+    categoryOrSubject: "Freelancers & Consultants",
+    phone: "+91 75073 84721",
+    notesOrMessage: "Setup request",
+    whatsappMessage: "Hi!",
+    submittedAt: "2026-11-13T14:15:00.000Z",
+  });
+
+  const parsedUrl = new URL(req.url);
+  assert.equal(parsedUrl.searchParams.get("phone"), "'+91 75073 84721");
+  assert.equal(req.payload.phone, "'+91 75073 84721");
+  assert.equal(req.payload["WhatsApp / Phone"], "'+91 75073 84721");
+  assert.equal(req.payload.row[5], "'+91 75073 84721");
 });
 
 test("submitFormToBackend falls back to Apps Script webhook when /api/submissions returns 404", async () => {

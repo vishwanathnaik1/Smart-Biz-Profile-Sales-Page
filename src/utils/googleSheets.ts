@@ -88,17 +88,28 @@ export function formatAsiaKolkataTimestamp(input: Date | string = new Date()): s
   return `${get("day")}/${get("month")}/${get("year")}, ${get("hour")}:${get("minute")}:${get("second")} ${dayPeriod} IST`;
 }
 
+const SHEET_FORMULA_PREFIX_REGEX = /^[=+\-@]/;
+
+export function escapeSheetCellValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (SHEET_FORMULA_PREFIX_REGEX.test(trimmed)) {
+    return `'${trimmed}`;
+  }
+  return trimmed;
+}
+
 export function buildSheetSubmissionRow(entry: FormSubmissionEntry): string[] {
   const timestamp = formatAsiaKolkataTimestamp(entry.submittedAt ?? new Date());
   return [
     timestamp,
     entry.formType,
-    entry.name.trim(),
-    entry.email.trim(),
-    entry.categoryOrSubject.trim(),
-    entry.phone.trim(),
-    entry.notesOrMessage.trim(),
-    entry.whatsappMessage.trim(),
+    escapeSheetCellValue(entry.name),
+    escapeSheetCellValue(entry.email),
+    escapeSheetCellValue(entry.categoryOrSubject),
+    escapeSheetCellValue(entry.phone),
+    escapeSheetCellValue(entry.notesOrMessage),
+    escapeSheetCellValue(entry.whatsappMessage),
   ];
 }
 
@@ -158,12 +169,12 @@ export function buildWebhookRequest(
   const sheetTitle = options?.sheetTitle?.trim() || "Sheet1";
   const normalizedEntry: FormSubmissionEntry = {
     formType: entry.formType,
-    name: entry.name.trim(),
-    email: entry.email.trim(),
-    categoryOrSubject: entry.categoryOrSubject.trim(),
-    phone: entry.phone.trim(),
-    notesOrMessage: entry.notesOrMessage.trim(),
-    whatsappMessage: entry.whatsappMessage.trim(),
+    name: escapeSheetCellValue(entry.name),
+    email: escapeSheetCellValue(entry.email),
+    categoryOrSubject: escapeSheetCellValue(entry.categoryOrSubject),
+    phone: escapeSheetCellValue(entry.phone),
+    notesOrMessage: escapeSheetCellValue(entry.notesOrMessage),
+    whatsappMessage: escapeSheetCellValue(entry.whatsappMessage),
     submittedAt,
   };
   const row = buildSheetSubmissionRow(normalizedEntry);
