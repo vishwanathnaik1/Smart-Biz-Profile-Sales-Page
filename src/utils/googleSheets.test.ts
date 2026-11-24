@@ -138,7 +138,7 @@ test("submitFormToBackend falls back to Apps Script webhook when /api/submission
     assert.equal(calls.length, 2);
     assert.equal(calls[0].url, "/api/submissions");
     assert.match(calls[1].url, /^https:\/\/script\.google\.com\/macros\/s\/test\/exec\?gid=0&/);
-    assert.equal(calls[1].init?.mode, "no-cors");
+    assert.equal(calls[1].init?.mode, "cors");
     assert.equal(calls[1].init?.keepalive, true);
   } finally {
     globalThis.fetch = originalFetch;
@@ -150,7 +150,7 @@ test("submitFormToBackend dispatches webhook directly when skipBackendProbe is t
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     calls.push({ url: String(input), init });
-    return new Response(null, { status: 200 });
+    return new Response(JSON.stringify({ status: "success" }), { status: 200 });
   }) as typeof fetch;
 
   try {
@@ -176,6 +176,98 @@ test("submitFormToBackend dispatches webhook directly when skipBackendProbe is t
     assert.equal(calls.length, 1);
     assert.match(calls[0].url, /^https:\/\/script\.google\.com\/macros\/s\/test\/exec\?gid=0&/);
     assert.equal(calls[0].init?.keepalive, true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("submitFormToBackend retries with application/x-www-form-urlencoded when webhook reports no parameters", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ url: String(input), init });
+    if (calls.length === 1) {
+      return new Response(
+        JSON.stringify({ status: "success", message: "No parameters detected" }),
+        { status: 200 },
+      );
+    }
+    return new Response(JSON.stringify({ status: "success" }), { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const res = await submitFormToBackend(
+      {
+        formType: "Claim Smart Biz Profile",
+        name: "Vishwanath Naik",
+        email: "vishunaik1229@gmail.com",
+        categoryOrSubject: "Coaches & Consultants",
+        phone: "7507384721",
+        notesOrMessage: "Setup",
+        whatsappMessage: "Hi!",
+        submittedAt: "2026-11-13T14:15:00.000Z",
+      },
+      {
+        webhookUrl: "https://script.google.com/macros/s/test/exec?gid=0",
+        skipBackendProbe: true,
+      },
+    );
+
+    assert.equal(res.ok, true);
+    assert.equal(res.syncedToSheet, true);
+    assert.equal(calls.length, 2);
+    assert.equal(
+      (calls[0].init?.headers as Record<string, string>)["Content-Type"],
+      "text/plain;charset=utf-8",
+    );
+    assert.equal(
+      (calls[1].init?.headers as Record<string, string>)["Content-Type"],
+      "application/x-www-form-urlencoded;charset=UTF-8",
+    );
+    assert.match(String(calls[1].init?.body ?? ""), /name=Vishwanath\+Naik/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("submitFormToBackend falls back to no-cors form-urlencoded when CORS fetch throws", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({ url: String(input), init });
+    if (calls.length === 1) {
+      throw new TypeError("Failed to fetch");
+    }
+    return new Response(null, { status: 200 });
+  }) as typeof fetch;
+
+  try {
+    const res = await submitFormToBackend(
+      {
+        formType: "Claim Smart Biz Profile",
+        name: "Vishwanath Naik",
+        email: "vishunaik1229@gmail.com",
+        categoryOrSubject: "Coaches & Consultants",
+        phone: "7507384721",
+        notesOrMessage: "Setup",
+        whatsappMessage: "Hi!",
+        submittedAt: "2026-11-13T14:15:00.000Z",
+      },
+      {
+        webhookUrl: "https://script.google.com/macros/s/test/exec?gid=0",
+        skipBackendProbe: true,
+      },
+    );
+
+    assert.equal(res.ok, true);
+    assert.equal(res.syncedToSheet, true);
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].init?.mode, "cors");
+    assert.equal(calls[1].init?.mode, "no-cors");
+    assert.equal(
+      (calls[1].init?.headers as Record<string, string>)["Content-Type"],
+      "application/x-www-form-urlencoded;charset=UTF-8",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -1,5 +1,4 @@
-import { ArrowUpRight, FileSpreadsheet, MessageCircle } from "lucide-react";
-import { useGoogleSheets } from "../context/GoogleSheetsContext";
+import { ArrowUpRight, MessageCircle } from "lucide-react";
 import { FOOTER_NAV_LINKS, type AppRoute } from "../utils/routing";
 
 interface FooterProps {
@@ -8,8 +7,6 @@ interface FooterProps {
 }
 
 export function Footer({ currentRoute, onNavigate }: FooterProps) {
-  const { connection, accessToken, needsAuth, openSheetsModal } = useGoogleSheets();
-  const isSheetConnected = Boolean(connection && accessToken && !needsAuth);
 
   return (
     <footer className="border-t border-white/10 bg-[var(--surface-dark)] pt-12 pb-24 text-white md:pb-10">
@@ -91,14 +88,6 @@ export function Footer({ currentRoute, onNavigate }: FooterProps) {
                   <MessageCircle className="h-4 w-4 shrink-0 text-[var(--success)]" aria-hidden="true" />
                   <span>+91 8329410074</span>
                 </a>
-                <button
-                  type="button"
-                  onClick={openSheetsModal}
-                  className="inline-flex items-center gap-2 text-left font-medium text-[oklch(78%_0.11_240)] transition-colors hover:text-white cursor-pointer"
-                >
-                  <FileSpreadsheet className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
-                  <span>{isSheetConnected ? "Google Sheets Connected" : "Google Sheets Sync"}</span>
-                </button>
                 <a
                   href="https://smartbizprofile.in/login"
                   target="_blank"

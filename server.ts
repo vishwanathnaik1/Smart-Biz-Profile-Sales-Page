@@ -28,7 +28,7 @@ const envDefaultConfig: ConnectedSheetConfig | null = process.env.GOOGLE_SPREADS
   ? {
       spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID.trim(),
       spreadsheetTitle: "Configured Backend Sheet",
-      sheetTitle: process.env.GOOGLE_SHEET_TAB?.trim() || "Form Submissions",
+      sheetTitle: process.env.GOOGLE_SHEET_TAB?.trim() || "Sheet1",
       spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${encodeURIComponent(
         process.env.GOOGLE_SPREADSHEET_ID.trim(),
       )}/edit`,
@@ -116,8 +116,14 @@ async function forwardViaWebhook(
       const text = await res.text().catch(() => "");
       if (!text) return true;
       try {
-        const parsed = JSON.parse(text) as { status?: string; ok?: boolean };
-        if (parsed.status !== "error" && parsed.ok !== false) {
+        const parsed = JSON.parse(text) as {
+          status?: string;
+          ok?: boolean;
+          message?: string;
+        };
+        const noParams =
+          typeof parsed.message === "string" && /no parameters/i.test(parsed.message);
+        if (parsed.status !== "error" && parsed.ok !== false && !noParams) {
           return true;
         }
       } catch {
@@ -408,7 +414,7 @@ async function startServer() {
     const targetSheetTitle =
       (typeof sheetTitle === "string" && sheetTitle.trim()) ||
       activeSheetConfig?.sheetTitle ||
-      "Form Submissions";
+      "Sheet1";
 
     if (token && targetSpreadsheetId) {
       const sheetAttempt = await appendRowViaSheetsApi(

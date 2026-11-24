@@ -116,7 +116,7 @@ export function getConfiguredSpreadsheetId(): string {
 }
 
 export function getConfiguredSheetTab(): string {
-  return getViteEnvValue("VITE_GOOGLE_SHEET_TAB") || "Form Submissions";
+  return getViteEnvValue("VITE_GOOGLE_SHEET_TAB") || "Sheet1";
 }
 
 export interface WebhookRequestData {
@@ -155,7 +155,7 @@ export function buildWebhookRequest(
 ): WebhookRequestData {
   const submittedAt = formatAsiaKolkataTimestamp(entry.submittedAt ?? new Date());
   const spreadsheetId = options?.spreadsheetId?.trim() || "";
-  const sheetTitle = options?.sheetTitle?.trim() || "Form Submissions";
+  const sheetTitle = options?.sheetTitle?.trim() || "Sheet1";
   const normalizedEntry: FormSubmissionEntry = {
     formType: entry.formType,
     name: entry.name.trim(),
@@ -338,26 +338,73 @@ export async function submitFormToBackend(
     options?.sheetConfig?.spreadsheetId || getConfiguredSpreadsheetId();
   const targetSheetTitle = options?.sheetConfig?.sheetTitle || getConfiguredSheetTab();
 
-  const dispatchClientWebhook = () => {
+  const isWebhookErrorResponse = (rawText: string): boolean => {
+    if (!rawText) return false;
+    try {
+      const parsed = JSON.parse(rawText) as {
+        status?: string;
+        ok?: boolean;
+        message?: string;
+      };
+      if (parsed.status === "error" || parsed.ok === false) {
+        return true;
+      }
+      if (typeof parsed.message === "string" && /no parameters/i.test(parsed.message)) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  };
+
+  const dispatchClientWebhook = async (): Promise<boolean> => {
     const webhookReq = buildWebhookRequest(fallbackWebhookUrl, normalizedEntry, {
       spreadsheetId: targetSpreadsheetId,
       sheetTitle: targetSheetTitle,
     });
 
-    return fetch(webhookReq.url, {
-      method: "POST",
-      mode: "no-cors",
-      keepalive: true,
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(webhookReq.payload),
-    });
+    try {
+      const res = await fetch(webhookReq.url, {
+        method: "POST",
+        mode: "cors",
+        keepalive: true,
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(webhookReq.payload),
+      });
+
+      if (res.ok) {
+        const text = await res.text().catch(() => "");
+        if (!isWebhookErrorResponse(text)) {
+          return true;
+        }
+      }
+
+      const formRes = await fetch(webhookReq.url, {
+        method: "POST",
+        mode: "cors",
+        keepalive: true,
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: webhookReq.formBody,
+      });
+      return formRes.ok;
+    } catch {
+      await fetch(webhookReq.url, {
+        method: "POST",
+        mode: "no-cors",
+        keepalive: true,
+        headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+        body: webhookReq.formBody,
+      });
+      return true;
+    }
   };
 
   if (options?.skipBackendProbe && !options?.accessToken && fallbackWebhookUrl) {
-    await dispatchClientWebhook();
+    const syncedToSheet = await dispatchClientWebhook();
     return {
       ok: true,
-      syncedToSheet: true,
+      syncedToSheet,
       submittedAt,
     };
   }
@@ -406,10 +453,10 @@ export async function submitFormToBackend(
   }
 
   if (fallbackWebhookUrl) {
-    await dispatchClientWebhook();
+    const syncedToSheet = await dispatchClientWebhook();
     return {
       ok: true,
-      syncedToSheet: true,
+      syncedToSheet,
       submittedAt,
     };
   }
